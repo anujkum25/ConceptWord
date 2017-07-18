@@ -2,7 +2,7 @@ import time
 import os
 import pprint
 import tensorflow as tf
-from videocap.datasets.lsmdc_modified import DatasetLSMDC
+from videocap.datasets.lsmdc import DatasetLSMDC
 from videocap.datasets import data_util
 from videocap.util import log
 
@@ -38,7 +38,7 @@ def main(argv):
                                  max_n_videos=None,
                                  data_type=train_config.train_tag,
                                  attr_length=model_config.attr_length)
-    validation_dataset = DatasetLSMDC(dataset_name='test',
+    validation_dataset = DatasetLSMDC(dataset_name='validation',
                                       image_feature_net=model_config.image_feature_net,
                                       layer=model_config.layer,
                                       max_length=model_config.video_steps,

@@ -235,7 +235,7 @@ class FIBGenerator(object):
         self.attribute, self.concept_loss = self.concept_detector.build_attributes(
             self.attr_cell, self.video, self.video_mask, self.target_attribute, reuse_variable)
 
-        self.fib_loss, self.prediction, self.acc = self.build_fib_decoder(
+        self.fib_loss, self.predictions, self.acc = self.build_fib_decoder(
             self.fw_cell, self.bw_cell, video_emb_state, self.attribute, reuse_variable)
 
         self.mean_loss = self.fib_loss + self.concept_loss
@@ -363,6 +363,6 @@ class FIBTrainer(object):
             attr = []
             for idx in attribute_indices[0]:
                 attr.append(dataset.idx2word[idx])
-            log.info("attributes: {}".format(attr))
+            log.info("concepts: {}".format(attr))
         total_acc = self.sess.run(self.accuracy)
         log.infov("[FIB] total accurycy: {acc:.5f}".format(total_acc))

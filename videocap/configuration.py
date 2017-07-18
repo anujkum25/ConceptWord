@@ -52,5 +52,5 @@ class TrainConfig(object):
         self.max_grad_norm = 30.0
 
         self.steps_per_logging = 4
-        self.steps_per_evaluate = 1000
+        self.steps_per_evaluate = 5000
         self.train_tag = 'FIB'

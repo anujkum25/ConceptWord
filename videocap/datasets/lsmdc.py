@@ -1,17 +1,17 @@
 import numpy as np
 
 from videocap.util import log
-from attribute_extractor import AttributeExtractor
 
 import itertools
-import re
 import os.path
 import random
 import h5py
+import sys
 
 import pandas as pd
 import data_util
 import hickle as hkl
+from ast import literal_eval
 
 # For debug purpose
 import pudb
@@ -39,67 +39,41 @@ assert_exists(VIDEO_FEATURE_DIR)
 
 class DatasetLSMDC():
     '''
-    Access API for LSMDC Videos.
+    Access API for LSMDC videos.
     '''
 
     def __init__(self,
                  dataset_name='train',
                  image_feature_net='resnet',
-                 layer='pool5',
-                 padding=True,
+                 layer='res5c',
                  max_length=80,
-                 use_tgif=False,
                  max_n_videos=None,
                  attr_length=20,
-                 top_num=5
-                 ):
-        self.use_tgif = use_tgif
-        self.max_length = max_length
+                 data_type=None):
         self.dataset_name = dataset_name
-        self.image_feature_net = image_feature_net.lower()
+        self.image_feature_net = image_feature_net
         self.layer = layer
-        self.data_df = self.read_df_from_csvfile()
+        self.max_length = max_length
+        self.max_n_videos = max_n_videos
         self.attr_length = attr_length
-        self.top_num = top_num
+        self.data_type = data_type
+
+        self.data_df = self.read_df_from_csvfile()
 
         if max_n_videos is not None:
             self.data_df = self.data_df[:max_n_videos]
+        self.ids = list(self.data_df.index)
 
-        self.video_ids = self.get_video_ids()
         self.feat_h5 = self.read_feat_from_hdf5()
-        if self.use_tgif:
-            self.tgif_h5 = self.read_tgif_hdf5()
 
     def __del__(self):
         self.feat_h5.close()
-        self.tgif_h5.close()
 
     def __len__(self):
-        ''' The number of images in this dataset. '''
-        return len(self.video_ids)
-
-    def get_video_ids(self):
-        return list(self.data_df.index)
-
-    def read_tgif_hdf5(self):
-        if self.image_feature_net.lower() == 'resnet':
-            if self.layer.lower() == 'res5c':
-                feature_file = os.path.join(VIDEO_FEATURE_DIR, 'TGIF_' + self.image_feature_net.upper()+".hdf5")
-                assert_exists(feature_file)
-            elif self.layer.lower() == 'pool5':
-                feature_file = os.path.join(VIDEO_FEATURE_DIR, "TGIF_" + self.image_feature_net.upper()
-                                            + "_" + self.layer.lower() + ".hdf5")
-                assert_exists(feature_file)
-            elif self.layer.lower() == 'fc1000':
-                feature_file = os.path.join(VIDEO_FEATURE_DIR, "TGIF_" + self.image_feature_net.upper()
-                                            + "_" + self.layer.lower() + ".hdf5")
-                assert_exists(feature_file)
-        elif self.image_feature_net.lower() == 'c3d':
-            feature_file = os.path.join(VIDEO_FEATURE_DIR, "TGIF_" + self.image_feature_net.upper() + ".hdf5")
-            assert_exists(feature_file)
-
-        log.info("Load %s hdf5 file: %s", self.image_feature_net.upper(), feature_file)
-        return h5py.File(feature_file, 'r')
+        if self.max_n_videos is not None:
+            if self.max_n_videos <= len(self.data_df):
+                return self.max_n_videos
+        return len(self.data_df)
 
     def read_feat_from_hdf5(self):
         if self.image_feature_net.lower() == 'resnet':
@@ -126,31 +100,41 @@ class DatasetLSMDC():
         return h5py.File(feature_file, 'r')
 
     def read_df_from_csvfile(self):
-        if self.dataset_name == 'train':
-            data_df_path = os.path.join(DATAFRAME_DIR, 'LSMDC16_CAP_train.csv')
-            assert_exists(data_df_path)
-        elif self.dataset_name == 'validation':
-            data_df_path = os.path.join(DATAFRAME_DIR, 'LSMDC16_CAP_val.csv')
-            assert_exists(data_df_path)
-        elif self.dataset_name == 'test':
-            data_df_path = os.path.join(DATAFRAME_DIR, 'LSMDC16_CAP_test.csv')
-            assert_exists(data_df_path)
+        if self.data_type is None:
+            self.data_type = 'CAP'
 
-        data_df = pd.read_csv(data_df_path, sep='\t')
-        log.info("Load %s csv file : %s", self.dataset_name, data_df_path)
+        assert self.data_type in ['CAP', 'FIB', 'MC'], 'Should choose data type in [CAP, FIB, MC]'
+
+        train_data_path = os.path.join(DATAFRAME_DIR, 'LSMDC16_'+self.data_type+'_train.csv')
+        train_cap_path = os.path.join(DATAFRAME_DIR, 'LSMDC16_CAP_train.csv')
+        val_data_path = os.path.join(DATAFRAME_DIR, 'LSMDC16_'+self.data_type+'_val.csv')
+        val_cap_path = os.path.join(DATAFRAME_DIR, 'LSMDC16_CAP_val.csv')
+        test_data_path = os.path.join(DATAFRAME_DIR, 'LSMDC16_'+self.data_type+'_test.csv')
+        test_cap_path = os.path.join(DATAFRAME_DIR, 'LSMDC16_CAP_test.csv')
+        blind_data_path = os.path.join(DATAFRAME_DIR, 'LSMDC16_'+self.data_type+'_blindtest.csv')
+        assert_exists(train_data_path)
+        assert_exists(val_data_path)
+        assert_exists(test_data_path)
+
+        train_cap_df = pd.read_csv(train_cap_path, sep='\t')
+        val_cap_df = pd.read_csv(val_cap_path, sep='\t')
+        test_cap_df = pd.read_csv(test_cap_path, sep='\t')
+        self.cap_df = pd.concat([train_cap_df, val_cap_df, test_cap_df])
+
+        if self.dataset_name == 'train':
+            data_df = pd.read_csv(train_data_path, sep='\t')
+        elif self.dataset_name == 'validation':
+            data_df = pd.read_csv(val_data_path, sep='\t')
+        elif self.dataset_name == 'test':
+            data_df = pd.read_csv(test_data_path, sep='\t')
+        elif self.dataset_name == 'blind':
+            data_df = pd.read_csv(blind_data_path, sep='\t')
 
         data_df = data_df.set_index('key')
+        data_df['row_index'] = range(1, len(data_df)+1)
+        self.cap_df = self.cap_df.set_index('key')
 
-        extract_field = ['description']
-        if self.use_tgif:
-            tgif_df_path = os.path.join(DATAFRAME_DIR, 'TGIF.csv')
-            assert_exists(tgif_df_path)
-            tgif_df = pd.read_csv(tgif_df_path, sep='\t')
-            tgif_df = tgif_df.set_index('key')
-            log.info("Load %s csv file : %s", 'TGIF', tgif_df_path)
-            return pd.concat([data_df.loc[:, extract_field], tgif_df.loc[:, extract_field]], axis=0)
-        else:
-            return data_df.loc[:, extract_field]
+        return data_df
 
     @property
     def n_words(self):
@@ -174,7 +158,11 @@ class DatasetLSMDC():
         like period (.) or comma (,) are stripped.
         When tokenizing, I use ``data_util.clean_str``
         '''
-        words = data_util.clean_str(sentence).split()
+        try:
+            words = data_util.clean_str(sentence).split()
+        except:
+            print sentence
+            sys.exit()
         words = words + [eos_word]
         for w in words:
             if not w:
@@ -188,6 +176,18 @@ class DatasetLSMDC():
         assert_exists(word2idx_path)
         idx2word_path = os.path.join(VOCABULARY_DIR, 'index_to_word.hkl')
         assert_exists(idx2word_path)
+        index_1000_path = os.path.join(VOCABULARY_DIR, 'index_1000.hkl')
+        assert_exists(index_1000_path)
+        word2idx_1000_path = os.path.join(VOCABULARY_DIR, 'word_to_index_1000.hkl')
+        assert_exists(word2idx_1000_path)
+
+        with open(word2idx_1000_path, 'r') as f:
+            self.word2idx_1000 = hkl.load(f)
+        log.info("Load word2idx_1000 from hkl file : %s", word2idx_1000_path)
+
+        with open(index_1000_path, 'r') as f:
+            self.index_1000 = hkl.load(f)
+        log.info("Load index_1000 from hkl file : %s", index_1000_path)
 
         with open(word_matrix_path, 'r') as f:
             self.word_matrix = hkl.load(f)
@@ -202,51 +202,6 @@ class DatasetLSMDC():
             self.idx2word = hkl.load(f)
         log.info("Load idx2word from hkl file : %s", idx2word_path)
 
-        self.attribute_extractor = AttributeExtractor(dataset=self,
-                                                      attr_length=self.attr_length,
-                                                      top_num=self.top_num)
-#    def build_word_vocabulary(self,
-#                              all_captions_source=None,
-#                              word_count_threshold=0,
-#                              ):
-#        '''
-#        borrowed this implementation from @karpathy's neuraltalk.
-#        '''
-#        log.infov('Building word vocabulary (%s) ...', self.dataset_name)
-#
-#        if all_captions_source is None:
-#            all_captions_source = self.iter_all_captions()
-#
-#        # enumerate all sentences to build frequency table
-#        word_counts = {}
-#        nsents = 0
-#        for sentence in tqdm(list(all_captions_source),
-#                             desc='Iterating all sentences'):
-#            nsents += 1
-#            for w in self.split_sentence_into_words(sentence):
-#                word_counts[w] = word_counts.get(w, 0) + 1
-#
-#        vocab = [w for w in word_counts if word_counts[w] >= word_count_threshold]
-#        log.info("Filtered vocab words (threshold = %d), from %d to %d",
-#                 word_count_threshold, len(word_counts), len(vocab))
-#
-#        # build index and vocabularies
-#        self.word2idx = {}
-#        self.idx2word = {}
-#
-#        self.idx2word[0] = '.'
-#        self.word2idx['#START#'] = 0
-#        for idx, w in enumerate(vocab, start=1):
-#            self.word2idx[w] = idx
-#            self.idx2word[idx] = w
-#
-#        word_counts['.'] = nsents
-#        bias_init_vector = np.array([1.0*word_counts[w] for i, w in self.idx2word.iteritems()])
-#        bias_init_vector /= np.sum(bias_init_vector)  # normalize to frequencies
-#        bias_init_vector = np.log(bias_init_vector)
-#        bias_init_vector -= np.max(bias_init_vector)  # shift to nice numeric range
-#        self.bias_init_vector = bias_init_vector
-
     def share_word_vocabulary_from(self, dataset):
         assert hasattr(dataset, 'idx2word') and hasattr(dataset, 'word2idx'), \
             'The dataset instance should have idx2word and word2idx'
@@ -259,58 +214,31 @@ class DatasetLSMDC():
 
         self.idx2word = dataset.idx2word
         self.word2idx = dataset.word2idx
+        self.index_1000 = dataset.index_1000
+        self.word2idx_1000 = dataset.word2idx_1000
         if hasattr(dataset, 'word_matrix'):
             self.word_matrix = dataset.word_matrix
 
-        self.attribute_extractor = AttributeExtractor(dataset=self,
-                                                      attr_length=self.attr_length,
-                                                      top_num=self.top_num)
-
-    # Dataset Access APIs (batch loading, etc)
-    # ========================================
-
-    def iter_video_ids(self, shuffle=False):
+    def iter_ids(self, shuffle=False):
         '''
-        Iterate video ids. (e.g. vid98834, ...)
+        Iterate data keys. (e.g. vid123..., FIB456..., MC789...,)
         '''
-        ids = list(self.video_ids)
         if shuffle:
-            random.shuffle(ids)
-        for id in ids:
-            yield id
+            random.shuffle(self.ids)
+        for key in self.ids:
+            yield key
 
-    def iter_all_captions(self):
-        '''
-        Iterate caption strings associated in the images.
-        '''
-        for id in self.iter_video_ids():
-            yield self.get_captions_for_video(id)
+    def load_video_feature(self, key):
+        video_id = self.data_df.loc[key, 'vid_key']
 
-    def get_root_for_video(self, video_id):
-        '''
-        Return root for description of video given id
-        '''
-        return self.data_df.loc[video_id, 'root']
-
-    def get_captions_for_video(self, video_id):
-        '''
-        Return caption strings for the given video id.
-        '''
-        return self.data_df.loc[video_id, 'description']
-
-    def iter_video_caption_root_pairs(self, shuffle=False):
-        '''
-        Iterate all (video_id, caption str, root) pairs in the dataset.
-        '''
-        for video_id in self.iter_video_ids(shuffle=shuffle):
-            yield (video_id,
-                   self.get_captions_for_video(video_id))
-
-    def load_video_feature(self, video_id):
         if video_id[:4] == 'tgif':
             video_feature = np.array(self.tgif_h5[video_id])
         elif video_id[:3] == 'vid':
             video_feature = np.array(self.feat_h5[video_id])
+        elif video_id[:3] == 'vas':
+            video_feature = np.array(self.crc_h5[video_id])
+        elif video_id[:3] == 'msr':
+            video_feature = np.array(self.msr_h5[video_id])
         else:
             raise Exception('video_key error in load_video_feature')
 
@@ -355,6 +283,10 @@ class DatasetLSMDC():
             return (self.max_length, 1, 1, 1024)
         raise NotImplementedError()
 
+    def get_video_feature(self, key):
+        video_feature = self.load_video_feature(key)
+        return video_feature
+
     def convert_sentence_to_matrix(self, sentence):
         '''
         Convert the given sentence into word indices and masks.
@@ -367,9 +299,105 @@ class DatasetLSMDC():
             sentence_word_indices : list of (at most) length T,
                 each being a word index
         '''
-        return [self.word2idx[w] for w in
-                self.split_sentence_into_words(sentence)
-                if w in self.word2idx]
+        sent2indices = [self.word2idx[w] for w in
+                        self.split_sentence_into_words(sentence)
+                        if w in self.word2idx]
+        T = len(sent2indices)
+        length = min(T, self.max_length)
+        return sent2indices[:length]
+
+    def get_video_mask(self, video_feature):
+        video_length = video_feature.shape[0]
+        return data_util.fill_mask(self.max_length,
+                                   video_length,
+                                   zero_location='LEFT')
+
+    def get_description(self, key):
+        '''
+        Return caption string for given key.
+        '''
+        description = self.data_df.loc[key, 'description']
+        return self.convert_sentence_to_matrix(description)
+
+    def get_sentence(self, key):
+        sentence = self.data_df.loc[key, 'sentence']
+        return self.convert_sentence_to_matrix(sentence)
+
+    def get_blank_sentence(self, key):
+        blank_sentence = self.data_df.loc[key, 'blank_sentence']
+        clean_blank_sent = data_util.clean_blank(blank_sentence)
+        sent2indices = [self.word2idx[w] for w in
+                        clean_blank_sent
+                        if w in self.word2idx]
+        T = len(sent2indices)
+        length = min(T, self.max_length)
+        return sent2indices[:length]
+
+    def get_blank_answer(self, key):
+        answer = self.data_df.loc[key, 'answer']
+        answer_idx = self.word2idx[data_util.clean_str(answer).split()[0]]
+        voc_size = self.word_matrix.shape[0]
+        onehot_answer = np.zeros(voc_size)
+        onehot_answer[answer_idx] = 1
+        return onehot_answer
+
+    def get_sentence_mask(self, sentence):
+        sent_length = len(sentence)
+        return data_util.fill_mask(self.max_length,
+                                   sent_length,
+                                   zero_location='RIGHT')
+
+    def get_blank_sent_mask(self, sentence):
+        mask = np.zeros(self.max_length)
+        if 1 in sentence:
+            idx = sentence.index(1)
+            mask[idx] = 1
+        return mask
+
+    def get_bow(self, key):
+        vid_key = self.data_df.loc[key, 'vid_key']
+        bow_words = self.cap_df.loc[vid_key, 'bow']
+        bow_words = literal_eval(bow_words)
+        bow_indices = [self.word2idx_1000[word] for word in bow_words]
+        bow_onehots = np.zeros(len(self.index_1000))
+        bow_onehots[bow_indices] = 1.0
+        return bow_onehots
+
+    def get_MC_dict(self, key):
+        a1 = self.data_df.loc[key, 'a1']
+        a2 = self.data_df.loc[key, 'a2']
+        a3 = self.data_df.loc[key, 'a3']
+        a4 = self.data_df.loc[key, 'a4']
+        a5 = self.data_df.loc[key, 'a5']
+        row_index = self.data_df.loc[key, 'row_index']
+
+        # as list of sentence strings
+        candidates = [a1, a2, a3, a4, a5]
+        answer = self.data_df.loc[key, 'answer']
+
+        candidates_to_indices = [self.convert_sentence_to_matrix(x)
+                                 for x in candidates]
+        return {
+            'answer': answer,
+            'candidates': candidates_to_indices,
+            'raw_sentences': candidates,
+            'row_indices': row_index,
+        }
+
+    def get_MC_matrix(self, candidates):
+        candidates_matrix = np.zeros([5, self.max_length], dtype=np.uint32)
+        for k in range(5):
+            sentence = candidates[k]
+            candidates_matrix[k, :len(sentence)] = sentence
+        return candidates_matrix
+
+    def get_MC_mask(self, candidates):
+        mask_matrix = np.zeros([5, self.max_length], dtype=np.uint32)
+        for k in range(5):
+            mask_matrix[k] = data_util.fill_mask(self.max_length,
+                                                 len(candidates[k]),
+                                                 zero_location='RIGHT')
+        return mask_matrix
 
     def assemble_into_sentence(self, word_matrix):
         '''
@@ -391,146 +419,184 @@ class DatasetLSMDC():
 
         return sentences
 
-    def get_nearest_verb_from_emb(self, verbemb_list):
-        '''
-        Get nearest verb in dataset
-        '''
-        B, T = verbemb_list.shape
-        verbs = [None] * B
-
-        for b in xrange(B):
-            np.sum((self.word_matrix - verbemb_list[b])**2, axis=1)
-            nearest_ind = np.argsort(verbemb_list[b])[0]
-            verbs[b] = self.idx2word[nearest_ind]
-
-        return verbs
-
-    def get_nearest_verb(self, verb_list):
-        '''
-        Get nearest verb in dataset
-        '''
-        B = len(verb_list)
-        verbs = [None] * B
-
-        for b in xrange(B):
-            verbs[b] = self.idx2word[verb_list[b]]
-
-        return verbs
-
-
-    def next_batch(self, batch_size=64, include_extra=False, shuffle=True):
-        '''
-        Prepare the next batch (as dict), which consists of:
-            - video ids
-            - video features
-            - sentence matrices
-            - roots
-
-        Args:
-            batch_size: the mini-batch size
-            include_extra: whether to include additional debug information
-                such as raw sentences, etc. Defaults to False (i.e. exclude)
-                for run-time performance concerns.
-            shuffle : shuffling index of video ids
-        '''
-        if not hasattr(self, '_batch_it'):
-            self._batch_it = \
-                itertools.cycle(self.iter_video_caption_root_pairs(shuffle=shuffle))
-
-        # first, collect the current batch chunk
-        chunk = []
-        for k in xrange(batch_size):
-            video_id, sentence = next(self._batch_it)
-            chunk.append((video_id, sentence))
-
-        # maximum sentence length. if None, max{ #words in sentence } is used
-        # TODO check RNN max length and <eos>
-        if self.max_length is None:
-            self.max_length = max(len(list(self.split_sentence_into_words(s)))
-                                  for _, s, _ in chunk)
-
-        # fill up the batch tensors
-        # TODO When using resnet, we can only use layer res5c
+    def get_CAP_result(self, chunk):
+        batch_size = len(chunk)
         batch_video_feature_convmap = np.zeros([batch_size]
-                                               + list(self.get_video_feature_dimension()), dtype=np.float32)
-        batch_video_ids = []
-        batch_caption_words = np.zeros([batch_size, self.max_length], dtype=np.uint32)
-        batch_attribute = np.zeros([batch_size, self.attr_length], dtype=np.uint32)
+                                               + list(self.get_video_feature_dimension()),
+                                               dtype=np.float32)
+        batch_caption = np.zeros([batch_size, self.max_length], dtype=np.uint32)
+        batch_bow = np.zeros([batch_size, len(self.index_1000)], dtype=np.uint32)
 
-        # Mask Init
         batch_video_mask = np.zeros([batch_size, self.max_length], dtype=np.uint32)
         batch_caption_mask = np.zeros([batch_size, self.max_length], dtype=np.uint32)
-        batch_attribute_mask = np.zeros([batch_size, self.attr_length], dtype=np.uint32)
 
-        if include_extra:
-            batch_caption_sentence = np.asarray([None] * batch_size)
+        batch_debug_sent = np.asarray([None] * batch_size)
 
-        # TODO have to divide role by four function [(i), (ii), (iii), (iv)]
         for k in xrange(batch_size):
-            video_id, sentence = chunk[k]
+            key = chunk[k]
+            video_feature = self.get_video_feature(key)
+            bow = self.get_bow(key)
+            video_mask = self.get_video_mask(video_feature)
 
-            current_video_feature = self.load_video_feature(video_id)  # [video_lenth, 7, 7, 2048]
-
-            # (i) video id and features (e.g. res5c)
-            batch_video_ids.append(video_id)
-            # Fill pad to have same length using ``data_util.pad_video``
-            batch_video_feature_convmap[k, :] = data_util.pad_video(current_video_feature,
+            batch_video_feature_convmap[k] = data_util.pad_video(video_feature,
                                                                     self.get_video_feature_dimension())
+            batch_bow[k] = bow
+            batch_video_mask[k] = video_mask
 
-            # (ii) sentence and its words representation
-            if include_extra:
-                batch_caption_sentence[k] = sentence
-
-            # sentence -> word list -> word matrix (sequence padding) and mask
-            sentence_word_indices = self.convert_sentence_to_matrix(sentence)
-            T = len(sentence_word_indices)
-            # print sentence, entence_word_indices
-
-            # TODO handle <EOS> and dot ('.') properly
-            length = min(T, self.max_length)
-            batch_caption_words[k, :length] = sentence_word_indices[:length]
-            # batch_caption_length[k] = length
-
-#            # (iii) root representation
-#            root = data_util.clean_root(root)
-#            if root in self.word2idx.keys():
-#                root_index = self.word2idx[root]
-#            else:
-#                root_index = 0
-#            batch_roots[k] = root_index
-
-            # (iv) Build video mask.
-            video_length = current_video_feature.shape[0]
-            batch_video_mask[k] = data_util.fill_mask(self.max_length,
-                                                      video_length,
-                                                      zero_location='LEFT')
-            batch_caption_mask[k] = data_util.fill_mask(self.max_length,
-                                                        len(sentence_word_indices),
-                                                        zero_location='RIGHT')
-
-            # (v) Build attribute and attribute_mask
-            attr, attr_mask = self.attribute_extractor.get_top_attribute(video_id)
-            batch_attribute[k] = attr
-            batch_attribute_mask[k] = attr_mask
+            if self.dataset_name != 'blind':
+                try:
+                    caption = self.get_description(key)
+                    caption_mask = self.get_sentence_mask(caption)
+                except:
+                    print key
+                    sys.exit()
+                batch_caption[k, :len(caption)] = caption
+                batch_caption_mask[k] = caption_mask
+                batch_debug_sent[k] = self.data_df.loc[key, 'description']
 
         ret = {
-            'ids': batch_video_ids,
+            'ids': chunk,
             'video_features': batch_video_feature_convmap,
-            'caption_words': batch_caption_words,
+            'caption_words': batch_caption,
+            'bow': batch_bow,
             'video_mask': batch_video_mask,
             'caption_mask': batch_caption_mask,
-            'attribute': batch_attribute,
-            'attribute_mask': batch_attribute_mask
+            'debug_sent': batch_debug_sent
         }
-        if include_extra:
-            ret['caption_sentence'] = batch_caption_sentence
-
         return ret
 
-    def batch_iter(self, num_epochs, batch_size):
+    def get_FIB_result(self, chunk):
+        batch_size = len(chunk)
+        batch_video_feature_convmap = np.zeros([batch_size]
+                                               + list(self.get_video_feature_dimension()),
+                                               dtype=np.float32)
+        batch_blank_sent = np.zeros([batch_size, self.max_length], dtype=np.uint32)
+        batch_answer = np.zeros([batch_size, self.word_matrix.shape[0]], dtype=np.uint32)
+        batch_bow = np.zeros([batch_size, len(self.index_1000)], dtype=np.uint32)
+
+        batch_video_mask = np.zeros([batch_size, self.max_length], dtype=np.uint32)
+        batch_blank_sent_mask = np.zeros([batch_size, self.max_length], dtype=np.uint32)
+
+        batch_debug_sent = np.asarray([None] * batch_size)
+
+        for k in xrange(batch_size):
+            key = chunk[k]
+            video_feature = self.get_video_feature(key)
+            blank_sent = self.get_blank_sentence(key)
+            answer = self.get_blank_answer(key)
+            bow = self.get_bow(key)
+            batch_bow[k] = bow
+
+            video_mask = self.get_video_mask(video_feature)
+            blank_sent_mask = self.get_blank_sent_mask(blank_sent)
+
+            batch_video_feature_convmap[k] = data_util.pad_video(video_feature,
+                                                                    self.get_video_feature_dimension())
+            batch_blank_sent[k, :len(blank_sent)] = blank_sent
+            batch_answer[k] = answer
+
+            batch_video_mask[k] = video_mask
+            batch_blank_sent_mask[k] = blank_sent_mask
+
+            batch_debug_sent[k] = self.data_df.loc[key, 'sentence']
+
+        ret = {
+            'ids': chunk,
+            'video_features': batch_video_feature_convmap,
+            'blank_sent': batch_blank_sent,
+            'answer': batch_answer,
+            'bow': batch_bow,
+            'video_mask': batch_video_mask,
+            'answer': batch_answer,
+            'blank_sent_mask': batch_blank_sent_mask,
+            'debug_sent': batch_debug_sent
+        }
+        return ret
+
+    def get_MC_result(self, chunk):
+        batch_size = len(chunk)
+        batch_video_feature_convmap = np.zeros([batch_size]
+                                               + list(self.get_video_feature_dimension()),
+                                               dtype=np.float32)
+        batch_candidates = np.zeros([batch_size, 5, self.max_length], dtype=np.uint32)
+        batch_answer = np.zeros([batch_size], dtype=np.uint32)
+        batch_bow = np.zeros([batch_size, len(self.index_1000)], dtype=np.uint32)
+
+        batch_video_mask = np.zeros([batch_size, self.max_length], dtype=np.uint32)
+        batch_candidates_mask = np.zeros([batch_size, 5, self.max_length], dtype=np.uint32)
+
+        batch_debug_sent = np.asarray([None] * batch_size)
+        batch_raw_sentences = np.asarray([[None]*5 for _ in range(batch_size)])
+        batch_row_indices = np.asarray([-1] * batch_size)
+
+        for k in xrange(batch_size):
+            key = chunk[k]
+
+            MC_dict = self.get_MC_dict(key)
+            candidates = MC_dict['candidates']
+            raw_sentences = MC_dict['raw_sentences']
+            answer = MC_dict['answer']
+            bow = self.get_bow(key)
+            batch_bow[k] = bow
+
+            video_feature = self.get_video_feature(key)
+            candidates_matrix = self.get_MC_matrix(candidates)
+
+            video_mask = self.get_video_mask(video_feature)
+            candidates_mask = self.get_MC_mask(candidates)
+
+            batch_video_feature_convmap[k] = data_util.pad_video(video_feature,
+                                                                    self.get_video_feature_dimension())
+            batch_candidates[k] = candidates_matrix
+            batch_raw_sentences[k, :] = raw_sentences
+            batch_answer[k] = 0
+            batch_video_mask[k] = video_mask
+            batch_candidates_mask[k] = candidates_mask
+            batch_row_indices[k] = MC_dict['row_indices']
+
+            if answer != 0:
+                batch_candidates[k, [0, answer], :] = batch_candidates[k, [answer, 0], :]
+                batch_candidates_mask[k, [0, answer], :] = batch_candidates_mask[k, [answer, 0], :]
+                batch_raw_sentences[k, [0, answer]] = batch_raw_sentences[k, [answer, 0]]
+
+            batch_debug_sent[k] = self.data_df.loc[key, 'a'+str(answer+1)]
+
+        ret = {
+            'ids': chunk,
+            'video_features': batch_video_feature_convmap,
+            'candidates': batch_candidates,
+            'raw_sentences': batch_raw_sentences,
+            'answer': batch_answer,
+            'bow': batch_bow,
+            'video_mask': batch_video_mask,
+            'candidates_mask': batch_candidates_mask,
+            'debug_sent': batch_debug_sent,
+            'row_indices': batch_row_indices
+        }
+        return ret
+
+    def next_batch(self, batch_size=64, include_extra=False, shuffle=True):
+        if not hasattr(self, '_batch_it'):
+            self._batch_it = itertools.cycle(self.iter_ids(shuffle=shuffle))
+
+        chunk = []
+        for k in xrange(batch_size):
+            key = next(self._batch_it)
+            chunk.append(key)
+
+        if self.data_type == 'CAP':
+            return self.get_CAP_result(chunk)
+        elif self.data_type == 'FIB':
+            return self.get_FIB_result(chunk)
+        elif self.data_type == 'MC':
+            return self.get_MC_result(chunk)
+        else:
+            raise Exception('data_type error in next_batch')
+
+    def batch_iter(self, num_epochs, batch_size, shuffle=True):
         for epoch in xrange(num_epochs):
             steps_in_epoch = int(len(self) / batch_size)
 
-            for s in range(steps_in_epoch):
+            for s in range(steps_in_epoch+1):
                 yield self.next_batch(batch_size,
-                                      include_extra=True)  # For DEBUG
+                                      shuffle=shuffle)  # For DEBUG
