@@ -53,4 +53,4 @@ class TrainConfig(object):
 
         self.steps_per_logging = 4
         self.steps_per_evaluate = 1000
-        self.train_tag = 'CAP'
+        self.train_tag = 'FIB'

@@ -226,7 +226,6 @@ class DatasetLSMDC():
         data_df = data_df.set_index('key')
         data_df['row_index'] = range(1, len(data_df)+1)
         self.cap_df = self.cap_df.set_index('key')
-        print self.cap_df.index
 
         return data_df
 
