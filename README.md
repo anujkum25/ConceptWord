@@ -23,6 +23,13 @@ If you use this code or dataset as part of any published research, please refer 
 
 ## Setup
 
+### Prerequisites
+
+Make sure you have the following software installed on your system:
+
+- Python 2.7
+- Tensorflow 1.0+
+
 ### Get our code
 
 ```
