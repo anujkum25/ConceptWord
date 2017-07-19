@@ -38,7 +38,7 @@ def main(argv):
                                  max_n_videos=None,
                                  data_type=train_config.train_tag,
                                  attr_length=model_config.attr_length)
-    validation_dataset = DatasetLSMDC(dataset_name='validation',
+    validation_dataset = DatasetLSMDC(dataset_name='test',
                                       image_feature_net=model_config.image_feature_net,
                                       layer=model_config.layer,
                                       max_length=model_config.video_steps,
@@ -51,7 +51,7 @@ def main(argv):
     train_iter = train_dataset.batch_iter(train_config.num_epochs, model_config.batch_size)
     train_queue = BatchQueue(train_iter, name='train')
     val_iter = validation_dataset.batch_iter(20*train_config.num_epochs, model_config.batch_size, shuffle=False)
-    val_queue = BatchQueue(val_iter, name='validation')
+    val_queue = BatchQueue(val_iter, name='test')
     train_queue.start_threads()
     val_queue.start_threads()
 

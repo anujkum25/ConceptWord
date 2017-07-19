@@ -365,4 +365,4 @@ class FIBTrainer(object):
                 attr.append(dataset.idx2word[idx])
             log.info("concepts: {}".format(attr))
         total_acc = self.sess.run(self.accuracy)
-        log.infov("[FIB] total accurycy: {acc:.5f}".format(total_acc))
+        log.infov("[FIB] total accurycy: {acc:.5f}".format(acc=total_acc))

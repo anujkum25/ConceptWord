@@ -86,28 +86,14 @@ class CAPGenerator(object):
         return result
 
     def build_caption_embedding(self, input_seqs, name=None, reuse_variable=False):
-        """Builds the input sequence(caption) embeddings.
 
-        Inputs:
-            self.input_seqs
-
-        Outputs:
-            seq_embeddings
-        """
         with tf.variable_scope("seq_embedding", reuse=reuse_variable), tf.device("/cpu:0"):
             seq_embeddings = tf.nn.embedding_lookup(self.word_embed_t, input_seqs, name=name)
 
         return seq_embeddings
 
     def build_video_embedding(self, video_cell, video, video_mask, reuse_variable):
-        """Builds the video input embeddings.
 
-        Inputs:
-            self.video
-
-        Outputs:
-            video_embeddings
-        """
         batch_size, time_steps, width, height, vid_dim = video.get_shape().as_list()
 
         with tf.variable_scope("video_rnn", initializer=self.initializer, reuse=reuse_variable) as scope:
@@ -183,18 +169,6 @@ class CAPGenerator(object):
                     target_attribute,
                     train_flag,
                     reuse_variable=False):
-        """Builds the model.
-        Args:
-            videos: A float32 Tensor with shape [batch_size, video_steps, height, width, channels].
-            video_masks: An int32 0/1 Tensor with shape [batch_size, video_length]
-            input_seqs: An int32 Tensor with shape [batch_size, padded_length].
-            target_seqs: An int32 Tensor with shape [batch_size, padded_length].
-            input_mask: An int32 0/1 Tensor with shape [batch_size, padded_length].
-            target_attrs: An int32 Tensor with shape [batch_size, attr_length].
-            reuse_variable: Boolean.
-        return:
-            mean_loss: A float scalar Tensor
-        """
 
         self.video = video  # [batch_size, length, kernel, kernel, channel]
         self.video_mask = video_mask  # [batch_size, length]

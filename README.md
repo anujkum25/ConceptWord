@@ -1,8 +1,35 @@
-VideoCap
-========
+# CT-SAN
 
-Setup
------
+This project hosts the code for our **CVPR 2017** paper.
+
+this is tensorflow implementation of [End-to-end Concept word Detection for Video Captioning, Retrieval, and Question Answering](https://arxiv.org/abs/1610.02947) which proposes a high-level concept word detector that can be integrated with any video-to-language models. It takes a video as input and generates a list of concept words as useful semantic priors for language generation models.
+
+
+
+## Reference
+
+If you use this code or dataset as part of any published research, please refer the following paper.
+
+```
+@inproceedings{CT-SAN:2017:CVPR,
+	author		= {Youngjae Yu and Hyungjin Ko and Jongwook Choi and Gunhee Kim},
+	title		= {End-to-end Concept word Detection for Video Captioning, Retrieval, and Question Answering},
+	booktitle	= {CVPR},
+	year		= 2017
+}
+```
+
+
+
+## Setup
+
+### Get our code
+
+```
+git clone https://gitlab.com/fodrh1201/CT-SAN
+```
+
+
 
 ### Basic Dependencies
 
@@ -10,38 +37,43 @@ Setup
 pip install -r requirements.txt
 ```
 
+
+
 ### Python PATH
 
 ```
 git submodule update --init --recursive
 add2virtualenv .
-add2virtualenv coco-caption
-```
+add2 virtualenv coco-caption
 
-```
 cd coco/PythonAPI
 python setup.py install
 ```
 
-Prepare Data
-------------
 
-* `dataset/mscoco/`
-* `dataset/lsmdc/`
 
-To make symbolic link:
+### Prepare Data
+
+- Video Feature
+  - Make video-file divided into frames using **ffmpeg** with 24 frames per second.
+  - Use one frame every 5 five frames.
+  - Extract Resnet-152 res5c feature and make it hdf file.
+  - Make soft link in dataset folder(not in videocap/datasets).
+- Data frames
+  - we process raw data frames file in LSMDC16.
+  - [[Download dataframes]](https://drive.google.com/open?id=0B1VtBNgsMJBgLXRseVhxVDhfSEE)
+- Vocabulary
+  - Embed words by GloVe word embedding
+
+
+
+### Training
+
+modify `configuartion.py` to suit your environment.
+
+Run `train.py`.
 
 ```
-ln -sf /data/common_datasets/captiongaze/ dataset/lsmdc/
+python train.py
 ```
 
-See README.md for details.
-
-
-Running Tests (Optional)
-------------------------
-
-```
-green
-green videocap/tests/test_datasets.py   # or green test_datasets.py in the directory
-```
