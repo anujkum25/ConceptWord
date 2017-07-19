@@ -58,7 +58,7 @@ python setup.py install
   - Make video-file divided into frames using **ffmpeg** with 24 frames per second.
   - Use one frame every 5 five frames.
   - Extract Resnet-152 res5c feature and make it hdf file.
-  - Make soft link in dataset folder(not in videocap/datasets).
+  - Make soft link in dataset folder(make datset folder in root)
 - Data frames
   - we process raw data frames file in LSMDC16.
   - [[Download dataframes]](https://drive.google.com/open?id=0B1VtBNgsMJBgLXRseVhxVDhfSEE)
