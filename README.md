@@ -23,13 +23,6 @@ If you use this code or dataset as part of any published research, please refer 
 
 ## Setup
 
-### Prerequisites
-
-Make sure you have the following software installed on your system:
-
-- Python 2.7
-- Tensorflow 1.0+
-
 ### Get our code
 
 ```
@@ -62,15 +55,43 @@ python setup.py install
 ### Prepare Data
 
 - Video Feature
-  - Make video-file divided into frames using **ffmpeg** with 24 frames per second.
-  - Use one frame every 5 five frames.
-  - Extract Resnet-152 res5c feature and make it hdf file.
-  - Make soft link in dataset folder(make datset folder in root)
+
+  1. Download [LSMDC data](https://sites.google.com/site/describingmovies/lsmdc-2016/download).
+
+  2. Extract all frames in videos into a separate folder. Here is one example script that extracts avi files into frames. You can save following script and run it with "./SCRIPT_NAME.sh INPUT_FOLDER avi OUTPUT_FOLDER"
+
+     ```
+     #!/bin/bash
+     if [ "$1" == '' ] || [ "$2" == '' ] || [ "$3" == '' ]; then
+     	echo "Usage: $0 <input folder> <file extension> <output folder>";
+     	exit;
+     fi
+     for file in "$1"/*."$3"; do
+     	destination="$2${file:${#1}:${#file}-${#1}-${#3}-1}";
+     	mkdir -p "$destination";
+     	ffmpeg -i "$file" "$destination/%d.jpg";
+     done
+     ```
+
+  3. Extract ResNet-152 features by using each pretrained models
+
+     - Extract 'res5c' for ResNet-152.
+     - Only use one frame every five frames.
+
+  4. Wrap each extracted features into hdf5 file, name as 'RESNET.hdf5' and save it in 'root/dataset/LSMDC/LSMDC16_features'. 
+
 - Data frames
-  - we process raw data frames file in LSMDC16.
+  - We processed raw data frames file in LSMDC16.
   - [[Download dataframes]](https://drive.google.com/open?id=0B1VtBNgsMJBgLXRseVhxVDhfSEE)
+  - Save these files in "root/dataset/LSMDC/DataFrame"
+
 - Vocabulary
-  - Embed words by GloVe word embedding
+
+  - We make word embedding matrix using GloVe Vector.
+  - [Download vocabulary files](https://drive.google.com/open?id=0B1VtBNgsMJBga09ubXE4ajhGNjg)
+  - These files include word embedding matrix file, word-index mapping file, and concept-index mapping file.
+  - Save these files in "root/dataset/LSMDC/Vocabulary"
+    ​
 
 
 

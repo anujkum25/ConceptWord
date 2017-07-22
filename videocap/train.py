@@ -63,7 +63,7 @@ def main(argv):
         session = tf.Session(graph=g, config=tf_config)
 
         model = MODELS[train_config.train_tag](model_config, train_dataset.word_matrix,
-                                               train_dataset.index_1000)
+                                               train_dataset.index_2000)
 
         log.info("Build the model...")
         model.build_model(**model.get_placeholder())

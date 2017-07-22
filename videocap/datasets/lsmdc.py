@@ -176,18 +176,18 @@ class DatasetLSMDC():
         assert_exists(word2idx_path)
         idx2word_path = os.path.join(VOCABULARY_DIR, 'index_to_word.hkl')
         assert_exists(idx2word_path)
-        index_1000_path = os.path.join(VOCABULARY_DIR, 'index_1000.hkl')
-        assert_exists(index_1000_path)
-        word2idx_1000_path = os.path.join(VOCABULARY_DIR, 'word_to_index_1000.hkl')
-        assert_exists(word2idx_1000_path)
+        index_2000_path = os.path.join(VOCABULARY_DIR, 'index_2000.hkl')
+        assert_exists(index_2000_path)
+        word2idx_2000_path = os.path.join(VOCABULARY_DIR, 'word_to_index_2000.hkl')
+        assert_exists(word2idx_2000_path)
 
-        with open(word2idx_1000_path, 'r') as f:
-            self.word2idx_1000 = hkl.load(f)
-        log.info("Load word2idx_1000 from hkl file : %s", word2idx_1000_path)
+        with open(word2idx_2000_path, 'r') as f:
+            self.word2idx_2000 = hkl.load(f)
+        log.info("Load word2idx_2000 from hkl file : %s", word2idx_1000_path)
 
-        with open(index_1000_path, 'r') as f:
-            self.index_1000 = hkl.load(f)
-        log.info("Load index_1000 from hkl file : %s", index_1000_path)
+        with open(index_2000_path, 'r') as f:
+            self.index_2000 = hkl.load(f)
+        log.info("Load index_2000 from hkl file : %s", index_2000_path)
 
         with open(word_matrix_path, 'r') as f:
             self.word_matrix = hkl.load(f)
@@ -214,8 +214,8 @@ class DatasetLSMDC():
 
         self.idx2word = dataset.idx2word
         self.word2idx = dataset.word2idx
-        self.index_1000 = dataset.index_1000
-        self.word2idx_1000 = dataset.word2idx_1000
+        self.index_2000 = dataset.index_2000
+        self.word2idx_2000 = dataset.word2idx_2000
         if hasattr(dataset, 'word_matrix'):
             self.word_matrix = dataset.word_matrix
 
@@ -358,8 +358,8 @@ class DatasetLSMDC():
         vid_key = self.data_df.loc[key, 'vid_key']
         bow_words = self.cap_df.loc[vid_key, 'bow']
         bow_words = literal_eval(bow_words)
-        bow_indices = [self.word2idx_1000[word] for word in bow_words]
-        bow_onehots = np.zeros(len(self.index_1000))
+        bow_indices = [self.word2idx_2000[word] for word in bow_words]
+        bow_onehots = np.zeros(len(self.index_2000))
         bow_onehots[bow_indices] = 1.0
         return bow_onehots
 
@@ -425,7 +425,7 @@ class DatasetLSMDC():
                                                + list(self.get_video_feature_dimension()),
                                                dtype=np.float32)
         batch_caption = np.zeros([batch_size, self.max_length], dtype=np.uint32)
-        batch_bow = np.zeros([batch_size, len(self.index_1000)], dtype=np.uint32)
+        batch_bow = np.zeros([batch_size, len(self.index_2000)], dtype=np.uint32)
 
         batch_video_mask = np.zeros([batch_size, self.max_length], dtype=np.uint32)
         batch_caption_mask = np.zeros([batch_size, self.max_length], dtype=np.uint32)
@@ -472,7 +472,7 @@ class DatasetLSMDC():
                                                dtype=np.float32)
         batch_blank_sent = np.zeros([batch_size, self.max_length], dtype=np.uint32)
         batch_answer = np.zeros([batch_size, self.word_matrix.shape[0]], dtype=np.uint32)
-        batch_bow = np.zeros([batch_size, len(self.index_1000)], dtype=np.uint32)
+        batch_bow = np.zeros([batch_size, len(self.index_2000)], dtype=np.uint32)
 
         batch_video_mask = np.zeros([batch_size, self.max_length], dtype=np.uint32)
         batch_blank_sent_mask = np.zeros([batch_size, self.max_length], dtype=np.uint32)
@@ -520,7 +520,7 @@ class DatasetLSMDC():
                                                dtype=np.float32)
         batch_candidates = np.zeros([batch_size, 5, self.max_length], dtype=np.uint32)
         batch_answer = np.zeros([batch_size], dtype=np.uint32)
-        batch_bow = np.zeros([batch_size, len(self.index_1000)], dtype=np.uint32)
+        batch_bow = np.zeros([batch_size, len(self.index_2000)], dtype=np.uint32)
 
         batch_video_mask = np.zeros([batch_size, self.max_length], dtype=np.uint32)
         batch_candidates_mask = np.zeros([batch_size, 5, self.max_length], dtype=np.uint32)
